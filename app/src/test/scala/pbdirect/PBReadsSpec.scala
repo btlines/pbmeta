@@ -1,8 +1,15 @@
 package pbmeta
 
-import org.scalatest.{ Matchers, WordSpecLike }
+import org.scalatest.{ Matchers, WordSpec }
 
-class PBReadsSpec extends WordSpecLike with Matchers {
+object PBReadsSpec {
+  @PBSerializable object Grade extends Enumeration {
+    val GradeA, GradeB = Value
+  }
+  @PBSerializable case class GradeMessage(value: Option[Grade.Value])
+}
+
+class PBReadsSpec extends WordSpec with Matchers {
   "PBReads" should {
     "read a Boolean from Protobuf" in {
       @PBSerializable case class BooleanMessage(value: Option[Boolean])
@@ -39,13 +46,10 @@ class PBReadsSpec extends WordSpecLike with Matchers {
       val bytes = Array[Byte](10, 5, 72, 101, 108, 108, 111)
       bytes.pbTo[BytesMessage].value.get shouldBe Array[Byte](72, 101, 108, 108, 111)
     }
-    "read an enumeration from Protobuf" ignore {
-      @PBSerializable object Grade extends Enumeration {
-        val GradeA, GradeB = Value
-      }
+    "read an enumeration from Protobuf" in {
+      import PBReadsSpec._
       val bytesA = Array[Byte](8, 0)
       val bytesB = Array[Byte](8, 1)
-      @PBSerializable case class GradeMessage(value: Option[Grade.Value])
       bytesA.pbTo[GradeMessage] shouldBe GradeMessage(Some(Grade.GradeA))
       bytesB.pbTo[GradeMessage] shouldBe GradeMessage(Some(Grade.GradeB))
     }

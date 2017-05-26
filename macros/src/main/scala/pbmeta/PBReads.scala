@@ -52,7 +52,7 @@ trait PBReadsImplicits {
   def enum[E <: Enumeration](enum: E): PBReads[E#Value] =
     new PBReads[E#Value] {
       override def read(from: CodedInputStream): E#Value =
-        enum(PBReadsInt.read(from))
+        enum.apply(PBReadsInt.read(from))
     }
 }
 
