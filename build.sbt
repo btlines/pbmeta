@@ -16,5 +16,8 @@ lazy val macros = project.settings(
   libraryDependencies += "org.scalameta" %% "scalameta" % "1.7.0"
 )
 
-lazy val app = project.settings(metaMacroSettings).dependsOn(macros)
+lazy val app = project.settings(
+  metaMacroSettings,
+  libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.1" % Test
+).dependsOn(macros)
 

@@ -8,7 +8,8 @@ object Days extends Enumeration {
 }
 
 @PBSerializable
-case class Booking(name: String, isPaid: Boolean, day: Days.Value)
+case class Booking(name: String, isPaid: Boolean)
+@PBSerializable case class OneDay(day: Option[Days.Value])
 
 object Example extends App {
 
@@ -16,13 +17,18 @@ object Example extends App {
     def toHexString: String = bytes.toVector.map(b => "%02X".format(b)).mkString("[", " ", "]")
   }
 
-  val booking = new Booking("Hotel", isPaid = true, Days.Wednesday)
-  val bytes = booking.toByteArray
+  val booking = new Booking("Hotel", isPaid = true)
+  val bytes = booking.toPB
   println(s"$booking -> ${bytes.toHexString}")
-  println(s"${bytes.toHexString} -> ${bytes.parseTo[Booking]}")
+  println(s"${bytes.toHexString} -> ${bytes.pbTo[Booking]}")
 
-  val enumBytes = Days.Wednesday.toByteArray
+  val enumBytes = Days.Wednesday.toPB
   println(s"${Days.Wednesday} -> ${enumBytes.toHexString}")
-  println(s"${enumBytes.toHexString} -> ${enumBytes.parseTo[Days.Value]}")
+  println(s"${enumBytes.toHexString} -> ${enumBytes.pbTo[Days.Value]}")
+
+  val oneDay = OneDay(Some(Days.Friday))
+  val dayBytes = oneDay.toPB
+  println(s"${oneDay} -> ${dayBytes.toHexString}")
+  println(s"${dayBytes.toHexString} -> ${dayBytes.pbTo[OneDay]}")
 
 }

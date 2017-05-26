@@ -1,7 +1,7 @@
 package object pbmeta {
 
   implicit class PBWriteOps[A : PBWrites](a: A) {
-    def toByteArray: Array[Byte] = {
+    def toPB: Array[Byte] = {
       val out = new java.io.ByteArrayOutputStream()
       val to = com.google.protobuf.CodedOutputStream.newInstance(out)
       PBWrites[A].write(a, to)
@@ -11,7 +11,7 @@ package object pbmeta {
   }
 
   implicit class PBReadsOps(bytes: Array[Byte]) {
-    def parseTo[A: PBReads]: A = {
+    def pbTo[A: PBReads]: A = {
       val from = com.google.protobuf.CodedInputStream.newInstance(bytes)
       PBReads[A].read(from)
     }
