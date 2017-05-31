@@ -1,6 +1,6 @@
 lazy val metaMacroSettings: Seq[Def.Setting[_]] = Seq(
   scalaVersion in ThisBuild := "2.12.2",
-  version := "0.0.0",
+  version := "0.0.1",
   organization := "beyondthelines",
   licenses := ("MIT", url("http://opensource.org/licenses/MIT")) :: Nil,
   bintrayOrganization := Some("beyondthelines"),
