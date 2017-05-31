@@ -10,6 +10,16 @@ class PBSerializable extends scala.annotation.StaticAnnotation {
       q"implicit val pbReads: pbmeta.PBReads[Value] = pbmeta.PBReads.enum($name)"
 
     def prodWrites(name: Type.Name, params: Seq[Term.Param]): Defn.Val = {
+      val writeFields: Seq[Term.Apply] = params.foldLeft((Seq.empty[Term.Apply], 1)) {
+        case ((stats, index), param) =>
+          val i = indexOf(param) getOrElse index
+          (stats :+ writeField(i, param), i + 1)
+      }._1
+      val sizeOfFields: Seq[Term.Apply] = params.foldLeft((Seq.empty[Term.Apply], 1)) {
+        case ((stats, index), param) =>
+          val i = indexOf(param) getOrElse index
+          (stats :+ sizeOfField(i, param), i + 1)
+      }._1
       q"""
           implicit val pbWrites: pbmeta.PBWrites[$name] =
             new pbmeta.PBWrites[$name] {
@@ -18,10 +28,10 @@ class PBSerializable extends scala.annotation.StaticAnnotation {
                     to.writeTag(i, com.google.protobuf.WireFormat.WIRETYPE_LENGTH_DELIMITED)
                     to.writeUInt32NoTag(sizeOf(a))
                   }
-                  ..${params.zipWithIndex.map(writeField)}
+                  ..$writeFields
                }
                override def sizeOf(a: $name, at: Option[Int]): Int = {
-                  val sizes: Seq[Int] = Seq(..${params.zipWithIndex.map(sizeField)})
+                  val sizes: Seq[Int] = Seq(..$sizeOfFields)
                   sizes.reduceOption(_+_).getOrElse(0) +
                   at.map(com.google.protobuf.CodedOutputStream.computeTagSize).getOrElse(0)
                }
@@ -29,37 +39,49 @@ class PBSerializable extends scala.annotation.StaticAnnotation {
        """
     }
 
-    def sizeField(p: (Term.Param, Int)): Term.Apply = {
-      val (param"$pname: $ptype", i) = p
+    def indexOf(param: Term.Param): Option[Int] = param match {
+      case param"..$mods $pname: $ptype" =>
+        mods.collectFirst {
+          case mod"@Pos(..$args)" if args.nonEmpty => args.head.syntax.toInt
+        }
+      case _ => None
+    }
+
+    def sizeOfField(index: Int, param: Term.Param): Term.Apply = {
+      val param"..$mods $pname: $ptype" = param
       val typeName = innerType(ptype.get)
       val prefix = ptype.get.syntax.takeWhile(_ != '[')
-      val name  = Term.Name(pname.value)
-      val index = Lit.Int(i+1)
+      val name = Term.Name(pname.value)
+      val i = Lit.Int(index)
       prefix match {
         case "List" | "Map" | "Option" | "Seq" | "Set" =>
-          q"a.$name.map(v => pbmeta.PBWrites[$typeName].sizeOf(v, Some($index))).reduceOption(_+_).getOrElse(0)"
+          q"a.$name.map(v => pbmeta.PBWrites[$typeName].sizeOf(v, Some($i))).reduceOption(_+_).getOrElse(0)"
         case _ =>
-          q"pbmeta.PBWrites[$typeName].sizeOf(a.$name, Some($index))"
+          q"pbmeta.PBWrites[$typeName].sizeOf(a.$name, Some($i))"
       }
     }
 
-    def writeField(p: (Term.Param, Int)): Term.Apply = {
-      val (param"$pname: $ptype", i) = p
+    def writeField(index: Int, param: Term.Param): Term.Apply = {
+      val param"..$mods $pname: $ptype" = param
       val typeName = innerType(ptype.get)
       val prefix = ptype.get.syntax.takeWhile(_ != '[')
-      val name  = Term.Name(pname.value)
-      val index = Lit.Int(i+1)
+      val name = Term.Name(pname.value)
+      val i = Lit.Int(index)
       prefix match {
         case "List" | "Map" | "Option" | "Seq" | "Set" =>
-          q"a.$name.foreach(v => pbmeta.PBWrites[$typeName].write(v, to, Some($index)))"
+          q"a.$name.foreach(v => pbmeta.PBWrites[$typeName].write(v, to, Some($i)))"
         case _ =>
-          q"pbmeta.PBWrites[$typeName].write(a.$name, to, Some($index))"
+          q"pbmeta.PBWrites[$typeName].write(a.$name, to, Some($i))"
       }
     }
 
     def prodReads(name: Type.Name, ctor: Ctor.Primary): Defn.Val = {
       val fields: Seq[Defn.Var] = ctor.paramss.head.map(declareField)
-      val cases: Seq[Case] = ctor.paramss.head.zipWithIndex.map(readField)
+      val cases: Seq[Case] = ctor.paramss.head.foldLeft((Seq.empty[Case], 1)) {
+        case ((cases, index), param) =>
+          val i = indexOf(param) getOrElse index
+          (cases :+ readField(i, param), i + 1)
+      }._1
       val args = ctor.paramss.head.map(extractField)
       val constructor = Ctor.Ref.Name(name.value)
       q"""
@@ -98,27 +120,27 @@ class PBSerializable extends scala.annotation.StaticAnnotation {
     }
 
     def declareField(p: Term.Param): Defn.Var = {
-      val param"$pname: $ptype" = p
+      val param"..$mods $pname: $ptype" = p
       val typeName = innerType(ptype.get)
       q"var ${Pat.Var.Term(Term.Name(pname.value))}: List[$typeName] = Nil"
     }
 
-    def readField(p: (Term.Param, Int)): Case = {
-      val (param"$pname: $ptype", i) = p
+    def readField(index: Int, param: Term.Param): Case = {
+      val param"..$mods $pname: $ptype" = param
       val typeName = innerType(ptype.get)
       val name = Term.Name(pname.value)
-      val index = Lit.Int(i+1)
+      val i = Lit.Int(index)
       val knownTypes = Set("Boolean", "Int", "Long", "Float", "Double", "String", "Array[Byte]")
       val prefix = ptype.get.syntax.takeWhile(_ != ']')
       if (prefix == "Map" || (!knownTypes.contains(typeName.syntax) && !typeName.syntax.endsWith(".Value"))) {
-        p"case tag if (tag >> 3) == $index => from.readUInt32(); $name ::= pbmeta.PBReads[$typeName].read(from)"
+        p"case tag if (tag >> 3) == $i => from.readUInt32(); $name ::= pbmeta.PBReads[$typeName].read(from)"
       } else {
-        p"case tag if (tag >> 3) == $index => $name ::= pbmeta.PBReads[$typeName].read(from)"
+        p"case tag if (tag >> 3) == $i => $name ::= pbmeta.PBReads[$typeName].read(from)"
       }
     }
 
     def extractField(p: Term.Param): Term.Arg = {
-      val param"$pname: $ptype = $dfault" = p
+      val param"..$mods $pname: $ptype = $dfault" = p
       val prefix = ptype.get.syntax.takeWhile(_ != '[')
       val name = Term.Name(pname.value)
       val error = s""""Missing required field ${pname.value}""""

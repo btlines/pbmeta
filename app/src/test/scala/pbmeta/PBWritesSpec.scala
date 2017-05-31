@@ -87,5 +87,10 @@ class PBWritesSpec extends WordSpec with Matchers {
       val message = OuterMessage(Some("Hello"), Some(InnerMessage(Some(11))))
       message.toPB shouldBe Array[Byte](10, 5, 72, 101, 108, 108, 111, 18, 2, 8, 11)
     }
+    "write a multi-field message to Protobuf with specific indices" in {
+      @PBSerializable case class MultiMessage(@Pos(2) text: Option[String], number: Option[Int])
+      val message = MultiMessage(Some("Hello"), Some(3))
+      message.toPB shouldBe Array[Byte](18, 5, 72, 101, 108, 108, 111, 24, 3)
+    }
   }
 }
