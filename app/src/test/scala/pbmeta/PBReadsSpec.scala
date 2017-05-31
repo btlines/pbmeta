@@ -89,5 +89,10 @@ class PBReadsSpec extends WordSpec with Matchers {
       val bytes = Array[Byte](10, 5, 72, 101, 108, 108, 111, 18, 2, 8, 11)
       bytes.pbTo[OuterMessage] shouldBe OuterMessage(Some("Hello"), Some(InnerMessage(Some(11))))
     }
+    "read a multi-field message from Protobuf with specific indices" in {
+      @PBSerializable case class MultiMessage(@Pos(2) text: Option[String], number: Option[Int])
+      val bytes = Array[Byte](18, 5, 72, 101, 108, 108, 111, 24, 3)
+      bytes.pbTo[MultiMessage] shouldBe MultiMessage(Some("Hello"), Some(3))
+    }
   }
 }
