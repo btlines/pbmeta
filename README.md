@@ -95,3 +95,7 @@ This method is added implicitly on all `Array[Byte]` by importing `pbmeta._`.
 val bytes: Array[Byte] = Array[Byte](8, 123, 18, 5, 72, 101, 108, 108, 111, 24, 1, 32, 2, 40, 3, 48, 4)
 val message = bytes.pbTo[MyMessage]
 ```
+
+## More information
+
+Finally you can find more implementation details [over here](http://www.beyondthelines.net/computing/generating-protobuf-formats-with-scala-meta-macros/)
